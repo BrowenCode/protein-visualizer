@@ -1,12 +1,30 @@
-#cy {
-  width: 100vh;
-height: 93vh;
-  display: block;
-  background-color: #000;
+#view {
+	padding: 0;
+	border: 0;
+	width: 100vw;
+	height: 94vh;
+	display: block;
 }
 
+#cy {
+	padding: 0;
+	border: 0;
+	width: 80%;
+	height: 100%;
+	background-color: #000;
+	display: inline-block;
+}
+
+#tab {
+	border: 0;
+	width: 19%;
+	height: 100%;
+	padding: 0;
+	background-color: #444;
+	display: inline-block;
+}
 body {
-  background-color: white;
-  color: white;
+	background-color: black;
+	color: white;
 }
 

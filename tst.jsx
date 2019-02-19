@@ -14,25 +14,25 @@ var cy = cytoscape({
 				'label': 'data(name)',
 				'font-size': 5,
 				'width': function (ele) {
-					return 3 + Math.pow(ele.degree(true), 7/12);
+					return 2 + 2 * Math.log2(ele.degree(true));
 				},
 				'height': function (ele) {
-					return 3 + Math.pow(ele.degree(true), 7/12);
+					return 2 + 2 *  Math.log2(ele.degree(true));
 				},
 				'border-width': 0.4,
 				'padding': '30%',
 				'background-color': function (ele) {
 					if (ele.hasClass('named')) {
-						return 'green';
+						return 'darkgreen';
 					} else {
-						return 'lightgrey';
+						return 'grey';
 					}
 				},
 				'color': function (ele) {
 					if (ele.hasClass('named')) {
-						return 'black';
+						return 'white';
 					} else {
-						return 'black';
+						return 'white';
 					}
 				},
 				'opacity': 0.9			
@@ -296,3 +296,5 @@ var makeColor = function(r, g, b) {
         if (b.length == 1) {b = '0' + b;}
         return ('#' + r + g + b);
 }
+
+var make
