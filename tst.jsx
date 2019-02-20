@@ -3,9 +3,8 @@
 // Cytoscape variable: 
 var cy = cytoscape({
 	container: document.getElementById("cy"),	// Div where we'll put the Cytoscape visualization
-	minZoom: 1e-50,
-	maxZoom: 1e50,
-	selectionType: 'additive',
+	minZoom: 5e-1,
+	maxZoom: 40,
 
 	style: [		// Graph stylesheet 
 		{ selector: 'node',
@@ -23,9 +22,9 @@ var cy = cytoscape({
 				'padding': '30%',
 				'background-color': function (ele) {
 					if (ele.hasClass('named')) {
-						return 'darkgreen';
+						return 'green';
 					} else {
-						return 'grey';
+						return 'lightgrey';
 					}
 				},
 				'color': function (ele) {
@@ -44,7 +43,7 @@ var cy = cytoscape({
 					return (0.9 + Math.log2(ele.data('number_interactions')));
 				}, 
 	        		'line-color': '#bbb',
-				'opacity': 0.8 
+				'opacity': 0.9 
 					
 	      		}
 	    	}
@@ -153,34 +152,49 @@ var setElements = (json) => {
 			console.log('duplicate entry: ' + edge_id);
 		}
 	}
-	
+
+
+	colorClusters(cy.elements());
+
 	// 'Cose': a particular built-in layout (for positioning nodes)
-	var layout = cy.layout({ name: 'cose' }); 
+	var layout = cy.layout({
+		name: 'cose',
+		nodeDimensionsIncludeLabels: true,
+		fit: true,
+		padding: 20,
+		nodeRepulsion: function( node ){ return 10000; },
+		nodeOverlap: 4,
+	}); 
 
 	// Layout doesn't affect the graph until it's run
 	console.log('Applying layout...');
         layout.run();
 
-	// Fits the screen to the entire collection of nodes	
-	cy.fit();
-
-	colorClusters();
+	focused.select(cy.elements());
 
 	cy.endBatch();
+	// Fits the screen to the entire collection of nodes	
+
 	console.log('Graph ready!');
 };
 
-var colorClusters = () => {
+// Find Markov clusters and color them randomly
+var colorClusters = (elements) => {
 	console.log('Identifying Markov clusters...');
-	let clusters = cy.elements().markovClustering();
+	let clusters = elements.markovClustering();
 
 	console.log('Coloring graph...');
 	for(let i = 0; i < clusters.length; i++) {
-		let clusterColor = randomColor(0.8);
+		let clusterColor = randomColor();
 		let cluster = clusters[i];
+
+		// Might as well remember the clusters by indices
 		cluster.data('cluster', i);
 		cluster.data('cluster_color', clusterColor);
 	}
+
+	// The clusters are of nodes and not edges
+	// Thus, we must color edges by the average color of their connected nodes 
 	cy.edges().style('line-color', function(edge) {
 		let c1 = edge.source().data('cluster_color');
 		let c2 = edge.target().data('cluster_color');
@@ -198,81 +212,110 @@ window.addEventListener("keydown", keypress, false);
 
 // If the spacebar is pressed, we re-center to the entire graph
 function keypress(e) {
-	if (e.key == ' ') {
-		viewWhole();	
+        if (e.key == 'z' && e.metaKey) {
+                focused.back();
+        }else if (e.key == ' ') {
+		focused.clear();
 	}
 };
 
 // Upon clicking a node, hide any edge or node that isn't connected
 cy.on('click', 'node', function(evt){
-	console.log(evt);
 	let node = evt.target;
-	let neighbors = node.neighborhood().union(node);
-	if(evt.originalEvent.shiftKey){
-		addFocus(neighbors);
-	} else if (evt.originalEvent.metaKey){
-	} else {
-		focus(neighbors);
+	let clicks = evt.originalEvent.detail;
+	if (evt.originalEvent.shiftKey) {
+		focused.shiftclick(node, clicks + 1);
+	}else {
+		focused.click(node, clicks + 1);
 	}
 });
 
-var focused = cy.collection();
+// focusedElements: Provides functionality for setting specific nodes "in focus"
+// Keeps a stack of views for the user to easily revert back 
+class elementTracker {
 
-var setFocused = function(elements) {
-	elements.style('opacity', 1); 
-	cy.fit(elements);
-}
+	// Keep a stack to maintain state 
+	elementStack = [];
+	stackSize = 0;
+	
+	constructor(elements) {
+		if (elements) {
+			this.select(elements);
+		} 	
+	}
 
-var setUnfocused = function(elements) {
-        elements.style('opacity', function (ele) {
-                if (ele.isNode()) {
-                        return (0.9 / 8); 
-                }   
-                return (0.8 / 8); 
-        });
-}
+	viewSelected() {
+		this.elements.style('opacity', 0.9);
+		this.elements.complement().style('opacity', 0.1);
+		cy.fit(this.elements);
+	}
 
-var focus = function(elements) {
-	focused = elements;
-	setUnfocused(elements.abscomp());
-	setFocused(elements);
-	let unfocus = function(evt) {
-		if(!evt.target.id) {
-			viewWhole();
-			cy.removeListener('click', unfocus);
+	select (elements) {
+                this.elementStack[this.stackSize] = elements;
+                this.stackSize++;
+		this.viewSelected();
+	}
+
+	addElements(elements) {
+		this.select(this.elements.union(elements));	
+	}
+
+	get elements() {
+		return this.elementStack[this.stackSize - 1];
+	}
+
+	clear() {
+		this.select(cy.elements());
+	}
+
+	back() {
+		if (this.stackSize == 1 ){
+			return;
+		} else {
+			this.stackSize --;
+			this.viewSelected();	
 		}
 	}
-        cy.on('click', unfocus); 
-};
 
-var addFocus = function(elements) {
-	focused = focused.union(elements);
-	focus(focused);
+	// Find every element within n connections of the specified elements
+	getNeighborhood (elements, n) {
+		if (n == 1) {
+			return elements;	
+		} else {
+			return this.getNeighborhood(elements.union(elements.neighborhood()), n-1);
+		}
+	}
+
+	click(elements, n) {
+		this.select(this.getNeighborhood(elements, n));
+	}
+
+	shiftclick(elements, n) {
+		this.addElements(this.getNeighborhood(elements, n));
+	}
 }
 
-var viewWhole = function() {
-	focused = cy.collection();
-        cy.elements().style('opacity', function (ele) {
-                if (ele.isNode()) {
-                        return (0.9); 
-                }
-                return (0.8); 
-        });
-	cy.fit();
-}
+var focused = new elementTracker();
 
+
+// Generate a random color
 var randomColor = function() {
+	//random 2-digit numbers between 0 and 255
 	let r = (1<<8)*Math.random()|0;
 	let g = (1<<8)*Math.random()|0;
 	let b = (1<<8)*Math.random()|0;
-	let ratio = 255 / Math.max(r, g, b);
+
+	// We pick a number between 0 and 255 to bias the brightness
+	let ratio = 181 / Math.max(r, g, b);
 	r *= ratio;
 	g *= ratio;
 	b *= ratio;
 	return makeColor(r, g, b);
 }
 
+// Averages to colors in the form #rrggbb
 var averageColor = function(c1, c2) {
+	// Substring starts at index 1: we ignore the '#'
 	let r1 = parseInt(c1.substring(1, 3), 16);
 	let r2 = parseInt(c2.substring(1, 3), 16);
         let g1 = parseInt(c1.substring(3, 5), 16);
@@ -286,6 +329,7 @@ var averageColor = function(c1, c2) {
 	return makeColor(r, g, b);
 }
 
+// Takes three integers from 0 to 255 as inputs; returns a formatted string representing the corresponding color
 var makeColor = function(r, g, b) {
 	r = Math.round(r).toString(16);
 	g = Math.round(g).toString(16);
@@ -297,4 +341,4 @@ var makeColor = function(r, g, b) {
         return ('#' + r + g + b);
 }
 
-var make
+
