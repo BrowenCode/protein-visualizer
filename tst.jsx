@@ -39,9 +39,7 @@ var cy = cytoscape({
 		},
 		{ selector: 'edge',
 	      		style: {
-	        		'width': function(ele){
-					return (0.9 + Math.log2(ele.data('number_interactions')));
-				}, 
+	        		'width': 2, 
 	        		'line-color': '#bbb',
 				'opacity': 0.9 
 					
@@ -63,8 +61,6 @@ var setFile = (evt) => {
 // Takes a CSV file and returns a *promise* containing converted JSON
 // NOTE: the JSON is contaiend in response.data
 var csv_to_json = (csv) => {
-
-	console.log('Converting CSV to JSON...');
 	// Using Papa for the CSV => JSON conversion	
 	return new Promise(function(complete, error) {
 		Papa.parse(csv, {
@@ -176,6 +172,7 @@ var setElements = (json) => {
 	// Fits the screen to the entire collection of nodes	
 
 	console.log('Graph ready!');
+	$("#cy").css("cursor", "default");
 };
 
 // Find Markov clusters and color them randomly
@@ -225,8 +222,13 @@ cy.on('click', 'node', function(evt){
 	let clicks = evt.originalEvent.detail;
 	if (evt.originalEvent.shiftKey) {
 		focused.shiftclick(node, clicks + 1);
-	}else {
+		console.log(node.data());
+	} else if (evt.originalEvent.altKey) {
+		focused.altclick(node, clicks + 1);
+	}
+	else {
 		focused.click(node, clicks + 1);
+		console.log(node.data());
 	}
 });
 
@@ -245,9 +247,29 @@ class elementTracker {
 	}
 
 	viewSelected() {
-		this.elements.style('opacity', 0.9);
-		this.elements.complement().style('opacity', 0.1);
-		cy.fit(this.elements);
+		if (this.elements.size() > 0){
+			cy.animate({
+				fit: {
+					eles: this.elements
+				},
+				duration: 350
+			});
+		}
+		
+		this.elements.animate({
+			style: {
+				opacity: 0.9
+			},
+			duration: 350
+		});
+
+		this.elements.complement().animate({
+			style: {
+				opacity: 0.1
+			},
+			duration: 350
+		});
+
 	}
 
 	select (elements) {
@@ -258,6 +280,22 @@ class elementTracker {
 
 	addElements(elements) {
 		this.select(this.elements.union(elements));	
+	}
+
+	subtractElements(elements) {
+		// This includes nodes that we want to retain
+		let subtracted = this.elements.difference(elements);
+		// Filter elements by		
+		let retainedEdges = subtracted.filter((element) => {
+			return element.isEdge();
+		});
+
+		retainedEdges.forEach((edge) => {
+			subtracted = subtracted.union(edge.target());
+			subtracted = subtracted.union(edge.source());
+		});
+
+		this.select(subtracted);
 	}
 
 	get elements() {
@@ -286,12 +324,28 @@ class elementTracker {
 		}
 	}
 
+	// Number of nodes connected to this node that are in focus
+	focusedDegree (node, newelements) {
+		let edges = node.edges((edge) => {
+			return newelements.contains(edge);
+		});
+
+		let size = edges.size();
+		console.log(node.data('name'));
+		console.log(size)
+	}
+
 	click(elements, n) {
 		this.select(this.getNeighborhood(elements, n));
 	}
 
 	shiftclick(elements, n) {
-		this.addElements(this.getNeighborhood(elements, n));
+		elements = this.getNeighborhood(elements, n);
+		this.addElements(elements);
+	}
+
+	altclick(elements, n) {
+		this.subtractElements(this.getNeighborhood(elements, n));
 	}
 }
 
