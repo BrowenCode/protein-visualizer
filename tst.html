@@ -16,6 +16,13 @@
 		<!-- import Jquery -->
 		<script  src="https://code.jquery.com/jquery-3.3.1.min.js"  integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
 
+		<!-- UIkit CSS -->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.3/css/uikit.min.css" />
+
+		<!-- UIkit JS -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.3/js/uikit.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.3/js/uikit-icons.min.js"></script>
+
 		<!-- Import "Fat Papa" Papa Parse https://github.com/granthr97/PapaParse -->
 		<!-- Lets us parse CSV into JSON -->
 		<!-- TODO: Switch to "Lil Papa" (minified version) for deployment! -->
@@ -28,11 +35,28 @@
 
 <body>
 		<div id="view">
-			<div id="cy"></div>
-			<div id="tab"></div>
+			<div id="cy" ></div>
+			<div id="sidebar">
+					<p id='nodeinfo'></p>
+			</div>
 		</div>
-		<input type="file" id="files" name="files[]" multiple />
-		<output id="list"></output>
+
+		<div id="filebar" uk-form-custom>
+			<div uk-form-custom>
+				<button class="uk-button uk-button-default" type="button" id="server_button">LOAD FROM SERVER</button>
+			</div>
+			<div uk-form-custom>
+				<button class="uk-button uk-button-default" type="button" id="biogrid_button">LOAD FROM BIOGRID</button>
+			</div>
+			<div uk-form-custom>
+				<button class="uk-button uk-button-default" type="button"><input type="file" id="files" name="files[]"/>SELECT FILE</button>
+			</div>
+			<div uk-form-custom>
+				<button class="uk-button uk-button-default" type="button" id="clear_button">CLEAR NETWORK</button>
+			</div>
+			<div id = "statusdiv">
+			</div>
+		</div>
 
 		<!-- Include the script after the HTML so that it can interact with elements -->
 		<script src = "./tst.jsx"></script>

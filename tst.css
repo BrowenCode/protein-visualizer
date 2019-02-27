@@ -1,30 +1,59 @@
+body {
+	height: 100vh;
+	width: 100vw;
+	background-color: black;
+	color: white;
+}
+
 #view {
 	padding: 0;
 	border: 0;
 	width: 100vw;
-	height: 94vh;
-	display: block;
+	height: 97vh;
 }
 
 #cy {
 	padding: 0;
 	border: 0;
-	width: 100%;
+	width: 70%;
 	height: 100%;
 	background-color: #000;
 	display: inline-block;
 }
 
-#tab {
-	border: 0;
-	width: 0%;
+#sidebar {
+	background-color: #181818;
+	color: white;
 	height: 100%;
-	padding: 0;
-	background-color: #444;
+	width: 28%;
 	display: inline-block;
+	padding: 0;
 }
-body {
+
+#filebar{
+	width: 100vw;
+	background-color: #0c0c0c;
+}
+
+#nodeinfo{
+	height: 100%;
+	width: 100%;
+	overflow: scroll;
+}
+
+#filebar button {
 	background-color: black;
 	color: white;
 }
 
+#statusdiv {
+	color: white;
+	display: inline-block;
+	text-align: right;
+}
+
+#status {
+	text-align: right;
+	color: white;
+	background-color: white;
+}
