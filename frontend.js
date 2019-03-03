@@ -1,16 +1,57 @@
 "use strict";
 
-// Cytoscape variable: 
+let csv_url = 'http://frozen-sea-47108.herokuapp.com/';
+let biogrid_url = 'https://frozen-sea-47108.herokuapp.com/interactome?id=TGA3';
+
+$('#files').change((event) => {
+	setFile(event);
+});
+
+$('#server_button').click(() => {
+	$('#statusdiv').text('Retrieving data from server...');
+	get_data(csv_url);
+});
+
+$('#biogrid_button').click(() => {
+	$('#statusdiv').text('Retrieving data from Biogrid...');
+	get_data(biogrid_url);
+});
+
+$('#clear_button').click(() => {
+	cy.remove(cy.elements());
+	$('#statusdiv').text('Cleared the network.');
+});
+
+var get_data = (url) => {
+	$.ajax({
+		url: url,
+		method: 'GET',
+		type: 'application/json',
+		success: (response) => {
+			$('#statusdiv').text('Data retrieved...');
+			cy.add(response.elements);
+			loadGraph();
+		},
+		xhrFields: {
+				withCredentials: true
+		},
+		crossDomain: true
+	});
+};
+
+// Cytoscape variable:
 var cy = cytoscape({
 	container: document.getElementById("cy"),	// Div where we'll put the Cytoscape visualization
 	minZoom: 5e-1,
 	maxZoom: 40,
 
-	style: [		// Graph stylesheet 
+	style: [		// Graph stylesheet
 		{ selector: 'node',
 			style: {
 				'background-color': '#666',
-				'label': 'data(name)',
+				'label': function(ele) {
+						return ele.data('name')? ele.data('name') : ele.data('id');
+				},
 				'font-size': 5,
 				'width': function (ele) {
 					return 2 + 2 * Math.log2(ele.degree(true));
@@ -19,7 +60,7 @@ var cy = cytoscape({
 					return 2 + 2 *  Math.log2(ele.degree(true));
 				},
 				'border-width': 0.4,
-				'padding': '30%',
+				'padding': 0,
 				'background-color': function (ele) {
 					if (ele.hasClass('named')) {
 						return 'green';
@@ -34,17 +75,14 @@ var cy = cytoscape({
 						return 'white';
 					}
 				},
-				'opacity': 0.9			
+				'opacity': 0.9
 			}
 		},
 		{ selector: 'edge',
 	      		style: {
-	        		'width': function(ele){
-					return (0.9 + Math.log2(ele.data('number_interactions')));
-				}, 
+	        		'width': 1,
 	        		'line-color': '#bbb',
-				'opacity': 0.9 
-					
+							'opacity': 0.9
 	      		}
 	    	}
 	  ],
@@ -52,10 +90,12 @@ var cy = cytoscape({
 
 // setFile: Takes an file selection event and displays the graph
 var setFile = (evt) => {
-	console.log('Loading file...');
+	console.log('working');
+	$('#statusdiv').text('Loading file...');
 	let file = evt.target.files[0];
 	csv_to_json(file).then((json) => {
-		setElements(json.data);
+		setElementsLocal(json.data);
+		loadGraph();
 	});
 };
 
@@ -63,9 +103,7 @@ var setFile = (evt) => {
 // Takes a CSV file and returns a *promise* containing converted JSON
 // NOTE: the JSON is contaiend in response.data
 var csv_to_json = (csv) => {
-
-	console.log('Converting CSV to JSON...');
-	// Using Papa for the CSV => JSON conversion	
+	// Using Papa for the CSV => JSON conversion
 	return new Promise(function(complete, error) {
 		Papa.parse(csv, {
 			header: true,
@@ -75,11 +113,11 @@ var csv_to_json = (csv) => {
 };
 
 // Takes JSON extracted from CSV file; formats for Cytoscape
-var setElements = (json) => {
-	console.log('Parsing JSON...');
+var setElementsLocal = (json) => {
+	$('#statusdiv').text('Parsing JSON...');
+
 	// startBatch prevents Cytoscape from rendering elements as we add and change them
 	cy.startBatch();
-	
 	for (let i = 0; i < json.length; i++){
 		let bait_name = json[i]["Bait Name"];
 		let bait_locus = json[i]["Bait Locus"];
@@ -92,7 +130,11 @@ var setElements = (json) => {
 		if (bait_locus == ''){ break; }
 
 		// Add bait protein node
-		let bait = cy.$id(bait_locus);	
+		let bait = cy.getElementById(bait_locus);
+		// Add prey protein node
+		let prey = cy.getElementById(prey_locus);
+
+		// Create the bait node if it's not a duplicate
 		if (bait.length == 0) {
 			bait = cy.add({
 				group: 'nodes',
@@ -103,57 +145,57 @@ var setElements = (json) => {
 			});
 		}
 
-		// If bait has a name, and if the node hasn't been named, then add one
-		if (!bait.hasClass('named') && (bait_name != "")) {
+		// Create the prey node if it's not a duplicate
+		if (prey.length == 0) {
+      prey = cy.add({
+        group: 'nodes',
+        data: {
+          id: prey_locus,
+					name: prey_locus,
+        }
+      });
+    }
+
+		// If bait has a name, add one
+		if (bait_name) {
 			bait.addClass('named');
 			bait.data('name', bait_name);
-		}	
-	
+		}
+
 		// If the node doesn't already have bait notes, add it
-		if (!bait.data('bait_notes') && bait_notes) {
+		if (bait_notes) {
 			bait.data('bait_notes', bait_notes);
 		}
-	
-		// Add prey protein node
-		let prey = cy.$id(prey_locus);
-		if (prey.length == 0) {
-                        prey = cy.add({
-                                group: 'nodes',
-                                data: {
-                                        id: prey_locus,
-					name: prey_locus,
-                                }   
-                        }); 
-                }	
 
 		// If the node doesn't have prey_tair, add it
-		if (!prey.data('prey_tair') && prey_tair) {
+		if (prey_tair) {
 			prey.data('prey_tair', prey_tair);
 		}
 
 		// If the node doesn't have prey_description, add it
-		if (!prey.data('prey_description') && prey_description) {
+		if (prey_description) {
 			prey.data('prey_description', prey_description);
 		}
-	
+
 		// Add edge; ignore duplicates
 		let edge_id = bait_locus + '_' + prey_locus;
-		if (cy.$id(edge_id).length == 0) {
+		if (cy.getElementById(edge_id).length == 0) {
 			cy.add({
 				group: 'edges',
 				data: {
 					id: edge_id,
 					source: bait_locus,
 					target: prey_locus,
-					number_interactions: number_interactions,		
+					number_interactions: number_interactions,
 				},
 			});
 		} else {
-			console.log('duplicate entry: ' + edge_id);
+			$('#status').text('duplicate entry: ' + edge_id);
 		}
 	}
+};
 
-
+var loadGraph = () => {
 	colorClusters(cy.elements());
 
 	// 'Cose': a particular built-in layout (for positioning nodes)
@@ -161,29 +203,27 @@ var setElements = (json) => {
 		name: 'cose',
 		nodeDimensionsIncludeLabels: true,
 		fit: true,
-		padding: 20,
-		nodeRepulsion: function( node ){ return 10000; },
+		padding: 50,
+		nodeRepulsion: function( node ){ return 100000; },
 		nodeOverlap: 4,
-	}); 
+	});
 
 	// Layout doesn't affect the graph until it's run
-	console.log('Applying layout...');
-        layout.run();
-
-	focused.select(cy.elements());
+	$('#statusdiv').text('Applying layout...');
+				layout.run();
 
 	cy.endBatch();
-	// Fits the screen to the entire collection of nodes	
+	// Fits the screen to the entire collection of nodes
 
-	console.log('Graph ready!');
+	$('#statusdiv').text('Graph ready!');
 };
 
 // Find Markov clusters and color them randomly
 var colorClusters = (elements) => {
-	console.log('Identifying Markov clusters...');
+	$('#statusdiv').text('Identifying Markov clusters...');
 	let clusters = elements.markovClustering();
 
-	console.log('Coloring graph...');
+	$('#statusdiv').text('Coloring graph...');
 	for(let i = 0; i < clusters.length; i++) {
 		let clusterColor = randomColor();
 		let cluster = clusters[i];
@@ -193,20 +233,14 @@ var colorClusters = (elements) => {
 		cluster.data('cluster_color', clusterColor);
 	}
 
-	// The clusters are of nodes and not edges
-	// Thus, we must color edges by the average color of their connected nodes 
-	cy.edges().style('line-color', function(edge) {
-		let c1 = edge.source().data('cluster_color');
-		let c2 = edge.target().data('cluster_color');
-		return averageColor(c1, c2);
+  cy.edges().style('line-fill', "linear-gradient");
+	cy.edges().style('line-gradient-stop-colors', function(edge){
+		return edge.source().data('cluster_color') + ' ' + edge.target().data('cluster_color');
 	});
 
+	cy.edges().style('line-gradient-stop-positions', '0% 100%');
+
 };
-
-
-// Add event listener for file button
-document.getElementById('files').addEventListener('change', setFile, false);
-
 // Add event listener for the spacebar
 window.addEventListener("keydown", keypress, false);
 
@@ -225,29 +259,62 @@ cy.on('click', 'node', function(evt){
 	let clicks = evt.originalEvent.detail;
 	if (evt.originalEvent.shiftKey) {
 		focused.shiftclick(node, clicks + 1);
-	}else {
+	} else if (evt.originalEvent.altKey) {
+		focused.altclick(node, clicks + 1);
+	}
+	else {
 		focused.click(node, clicks + 1);
+		catJson(node.data());
 	}
 });
 
+// Concatonate json with the depth of one level
+var catJson = (json) => {
+	let cat = '';
+	for (var key in json){
+		cat += key + ': ' + json[key] + '<br />';
+	}
+	$('#nodeinfo').html(cat);
+}
+
 // focusedElements: Provides functionality for setting specific nodes "in focus"
-// Keeps a stack of views for the user to easily revert back 
+// Keeps a stack of views for the user to easily revert back
 class elementTracker {
 
-	// Keep a stack to maintain state 
+	// Keep a stack to maintain state
 	elementStack = [];
 	stackSize = 0;
-	
+
 	constructor(elements) {
 		if (elements) {
 			this.select(elements);
-		} 	
+		}
 	}
 
 	viewSelected() {
-		this.elements.style('opacity', 0.9);
-		this.elements.complement().style('opacity', 0.1);
-		cy.fit(this.elements);
+		if (this.elements.size() > 0){
+			cy.animate({
+				fit: {
+					eles: this.elements
+				},
+				duration: 350
+			});
+		}
+
+		this.elements.animate({
+			style: {
+				opacity: 0.9
+			},
+			duration: 350
+		});
+
+		this.elements.complement().animate({
+			style: {
+				opacity: 0.07
+			},
+			duration: 350
+		});
+
 	}
 
 	select (elements) {
@@ -257,7 +324,23 @@ class elementTracker {
 	}
 
 	addElements(elements) {
-		this.select(this.elements.union(elements));	
+		this.select(this.elements.union(elements));
+	}
+
+	subtractElements(elements) {
+		// This includes nodes that we want to retain
+		let subtracted = this.elements.difference(elements);
+		// Filter elements by
+		let retainedEdges = subtracted.filter((element) => {
+			return element.isEdge();
+		});
+
+		retainedEdges.forEach((edge) => {
+			subtracted = subtracted.union(edge.target());
+			subtracted = subtracted.union(edge.source());
+		});
+
+		this.select(subtracted);
 	}
 
 	get elements() {
@@ -273,17 +356,26 @@ class elementTracker {
 			return;
 		} else {
 			this.stackSize --;
-			this.viewSelected();	
+			this.viewSelected();
 		}
 	}
 
 	// Find every element within n connections of the specified elements
 	getNeighborhood (elements, n) {
 		if (n == 1) {
-			return elements;	
+			return elements;
 		} else {
 			return this.getNeighborhood(elements.union(elements.neighborhood()), n-1);
 		}
+	}
+
+	// Number of nodes connected to this node that are in focus
+	focusedDegree (node, newelements) {
+		let edges = node.edges((edge) => {
+			return newelements.contains(edge);
+		});
+
+		let size = edges.size();
 	}
 
 	click(elements, n) {
@@ -291,7 +383,12 @@ class elementTracker {
 	}
 
 	shiftclick(elements, n) {
-		this.addElements(this.getNeighborhood(elements, n));
+		elements = this.getNeighborhood(elements, n);
+		this.addElements(elements);
+	}
+
+	altclick(elements, n) {
+		this.subtractElements(this.getNeighborhood(elements, n));
 	}
 }
 
@@ -340,5 +437,3 @@ var makeColor = function(r, g, b) {
         if (b.length == 1) {b = '0' + b;}
         return ('#' + r + g + b);
 }
-
-
