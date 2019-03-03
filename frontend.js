@@ -3,11 +3,9 @@
 let csv_url = 'http://frozen-sea-47108.herokuapp.com/';
 let biogrid_url = 'https://frozen-sea-47108.herokuapp.com/interactome?id=TGA3';
 
-$(document).ready(() => {
+$('#files').change((event) => {
+	setFile(event);
 });
-
-// Add event listener for file button
-document.getElementById('files').addEventListener('change', setFile, false);
 
 $('#server_button').click(() => {
 	$('#statusdiv').text('Retrieving data from server...');
@@ -92,6 +90,7 @@ var cy = cytoscape({
 
 // setFile: Takes an file selection event and displays the graph
 var setFile = (evt) => {
+	console.log('working');
 	$('#statusdiv').text('Loading file...');
 	let file = evt.target.files[0];
 	csv_to_json(file).then((json) => {
